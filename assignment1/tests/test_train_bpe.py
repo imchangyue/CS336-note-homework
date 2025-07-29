@@ -1,6 +1,6 @@
 import json
 import time
-
+import base64
 from .adapters import run_train_bpe
 from .common import FIXTURES_PATH, gpt2_bytes_to_unicode
 
@@ -18,9 +18,10 @@ def test_train_bpe_speed():
     _, _ = run_train_bpe(
         input_path=input_path,
         vocab_size=500,
-        special_tokens=["<|endoftext|>"],
+        special_tokens=["<|endoftext|>"]
     )
     end_time = time.time()
+    print(end_time - start_time)
     assert end_time - start_time < 1.5
 
 
@@ -47,7 +48,10 @@ def test_train_bpe():
             )
             for merge_token_1, merge_token_2 in gpt2_reference_merges
         ]
+
+
     assert merges == reference_merges
+    
 
     # Compare the vocab to the expected output vocab
     with open(reference_vocab_path, encoding="utf-8") as f:
@@ -78,7 +82,6 @@ def test_train_bpe_special_tokens(snapshot):
     vocabs_without_specials = [word for word in vocab.values() if word != b"<|endoftext|>"]
     for word_bytes in vocabs_without_specials:
         assert b"<|" not in word_bytes
-
     snapshot.assert_match(
         {
             "vocab_keys": set(vocab.keys()),

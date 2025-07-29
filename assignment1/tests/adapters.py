@@ -8,7 +8,7 @@ from jaxtyping import Float, Int
 import numpy.typing as npt
 import torch
 from torch import Tensor
-
+import regex as re
 
 def run_linear(
     d_in: int,
@@ -568,25 +568,100 @@ def run_train_bpe(
     special_tokens: list[str],
     **kwargs,
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-    """Given the path to an input corpus, run train a BPE tokenizer and
-    output its vocabulary and merges.
+    with open(input_path, 'r', encoding='utf-8') as f:
+        data = f.read()
+        # 首先处理特殊标记
+    delimiter_pattern = "|".join(re.escape(s) for s in special_tokens)
+    parts = re.split(delimiter_pattern, data)
+    # # 正则表达式
+    PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+    tokens = []
+    token_number = {}
+    for part in parts:
+        tokens+=re.findall(PAT,part)
 
-    Args:
-        input_path (str | os.PathLike): Path to BPE tokenizer training data.
-        vocab_size (int): Total number of items in the tokenizer's vocabulary (including special tokens).
-        special_tokens (list[str]): A list of string special tokens to be added to the tokenizer vocabulary.
-            These strings will never be split into multiple tokens, and will always be
-            kept as a single token. If these special tokens occur in the `input_path`,
-            they are treated as any other string.
+    for token in tokens:
+        if token in token_number:
+            token_number[token] += 1
+        else: 
+            token_number[token] = 1
 
-    Returns:
-        tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
-            vocab:
-                The trained tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
-                to bytes (token bytes)
-            merges:
-                BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
-                representing that <token1> was merged with <token2>.
-                Merges are ordered by order of creation.
-    """
-    raise NotImplementedError
+    vocab = {}
+    current_id = 0
+    # 每个字节都作为长度为 1 的 bytes 对象
+    # 每个字节都作为长度为 1 的 bytes 对象
+    for token_str in special_tokens:
+        vocab[current_id] = token_str.encode("utf-8")  # 使用 .encode 将字符串转换为字节
+        current_id += 1
+    for i in range(256):
+        vocab[current_id] = bytes([i])  # 将整数 i 转换为单字节的 bytes 对象
+        current_id += 1
+    # 将特殊 Token 字符串编码为 bytes，并加入词汇表
+
+    freq_dict = {}  # 使用更好的命名
+    merges = []
+    # 新的 token_number 字典，键变成 tuple[bytes] 类型
+    new_token_number = {}
+
+    # 遍历原字典，将 string 转换为 tuple[bytes]
+    for token, count in token_number.items():
+        # 将字符串 token 转换为字节串，然后将它们转为 tuple
+        token_bytes_tuple = tuple(c for c in token) 
+        # 将新的元组作为键，值保持不变
+        new_token_number[token_bytes_tuple] = count
+    while current_id < vocab_size:
+        # 频率统计和合并循环
+        freq_dict = {}  # 每次循环都需要重新统计频率
+        for token in new_token_number:
+            number = len(token)
+            # 统计 token 中字符对的频率
+            for i in range(number - 1):
+                pair = (token[i], token[i + 1])  # 创建一个元组
+                if pair in freq_dict:
+                    freq_dict[pair] += new_token_number[token]  # 如果已经存在，就累加
+                else:
+                    freq_dict[pair] = new_token_number[token]  # 如果不存在，初始化为当前的值
+
+        # 找出频率最高的字符对 (pair, frequency)
+        max_pair = max(freq_dict.items(), key=lambda x: (x[1], x[0][0], x[0][1]))
+
+        # 将频率最高的字符对添加到 merges 列表中
+        merges.append(max_pair[0])
+
+        # 更新 vocab 字典，将合并后的字符对替换为新的 token
+        str = max_pair[0][0]+ max_pair[0][1]
+        vocab[current_id] = bytes([ord(c) for c in str]) # 合并后的字符对变成一个新的 token
+        current_id += 1
+
+        # 更新每个 token，将频率最高的字符对替换为合并后的新 token
+        new_tokens = {}
+        for token in new_token_number:
+            # 遍历 token 中的每个字符对，进行替换
+            updated_token = []
+            i = 0
+            while i < len(token) - 1:
+                pair = (token[i], token[i + 1])
+                if pair == max_pair[0]:  # 如果当前字符对是频率最高的字符对
+                    updated_token.append(max_pair[0][0] + max_pair[0][1])  # 替换为新 token
+                    i += 2  # 跳过已经合并的字符对
+                else:
+                    updated_token.append(token[i])  # 保留原字符
+                    i += 1
+
+            # 如果 token 的最后一个字符没有被处理过，加入更新后的 token 中
+            if i < len(token):
+                updated_token.append(token[i])
+
+            # 生成新的 token
+            new_tokens[tuple(updated_token)] = new_token_number[token]  # 更新后的 token
+
+        # 更新 new_token_number 为新的 token 字典
+        new_token_number = new_tokens
+    # 将字符元组转换为字节元组，逐字符处理
+    byte_merges = []
+    for c1, c2 in merges:
+        byte_c1 = bytes([ord(c) for c in c1])  # 将每个字符转换为字节
+        byte_c2 = bytes([ord(c) for c in c2])  # 将每个字符转换为字节
+        byte_merges.append((byte_c1, byte_c2))
+    # 最终输出更新后的词汇表和 token
+    return vocab,byte_merges
