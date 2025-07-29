@@ -5,3 +5,4 @@
 
 #### 7.29
  - working on assignment1
+ - studing lecture 3
