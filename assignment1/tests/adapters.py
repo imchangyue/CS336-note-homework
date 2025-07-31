@@ -4,7 +4,7 @@ import os
 from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
 from jaxtyping import Float, Int
-
+import time
 import numpy.typing as npt
 import torch
 from torch import Tensor
@@ -573,47 +573,24 @@ def run_train_bpe(
     **kwargs,
 ) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
     # 读取数据集
-    # with open(input_path, 'r', encoding='utf-8') as f:
-    #     data = f.read()
-    parts = []
-    with open(input_path, "rb") as f:
-        num_processes = 4
-        boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
-        for i, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:])):
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
-            print(len(chunk))
-            delimiter_pattern = "|".join(re.escape(s) for s in special_tokens)
-            parts += re.split(delimiter_pattern, chunk)
+    delimiter_pattern = "|".join(re.escape(s) for s in special_tokens)
+    with open(input_path, 'r', encoding='utf-8') as f:
+        data = f.read()
+    parts = re.split(delimiter_pattern, data)
 
-
-
-    # 正则表达式进行分词
     PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-    tokens = []
     token_number = {}
+
     for part in parts:
-        # 将每个字符都转换为 UTF-8 字节表示，处理所有字符（包括引号）
         part_tokens = re.findall(PAT, part)
         for token in part_tokens:
-            token_bytes = list(token.encode('utf-8'))  # 将 token 转换为 UTF-8 字节
-            tokens.append(token_bytes)
+            token_bytes = tuple(token.encode('utf-8'))  # 直接转换为字节元组
+            token_number[token_bytes] = token_number.get(token_bytes, 0) + 1  # 更新频率
 
-    # 计算每个 token 的频率
-    for token in tokens:
-        token_tuple = tuple(token)  # 转换为字节元组
-        if token_tuple in token_number:
-            token_number[token_tuple] += 1
-        else:
-            token_number[token_tuple] = 1
 
     # 初始化词汇表
-    vocab = {}
-    current_id = 0
-    # 添加所有单字节（0-255）的字节
-    for i in range(256):
-        vocab[current_id] = bytes([i])
-        current_id += 1
+    vocab = {i: bytes([i]) for i in range(256)}  # 直接初始化单字节字符
+    current_id = 256
     # 添加特殊标记到词汇表
     for token_str in special_tokens:
         vocab[current_id] = token_str.encode("utf-8")
@@ -622,41 +599,42 @@ def run_train_bpe(
     # 频率统计
     freq_dict = {}
     merges = []
-
-    # 将每个 token 转换为元组形式并计算频率
-    new_token_number = {}
-    for token, count in token_number.items():
-        token_bytes_tuple = tuple(token)  # 将字符串转为字节元组
-        new_token_number[token_bytes_tuple] = count
-
+    freq_dict = Counter()  # 重新统计频率
+    for token,count in token_number.items():
+        number = len(token) - 1
+        for i in range (number):
+            pair = (token[i], token[i + 1])  # 生成字节对
+            freq_dict[pair] += count # 累加频率
+    # 现在是初始的累加频率
     while current_id < vocab_size:
-        freq_dict = Counter()  # 重新统计频率
-        for token in new_token_number:
-            number = len(token)
-            for i in range(number - 1):
-                pair = (token[i], token[i + 1])  # 生成字节对
-                freq_dict[pair] += new_token_number[token]  # 累加频率
-
         # 找到频率最高的字符对
         max_pair = max(freq_dict.items(), key=lambda x: (x[1], vocab[x[0][0]], vocab[x[0][1]]))
-        pair = (vocab[max_pair[0][0]], vocab[max_pair[0][1]])
         # 将最高频的字符对添加到 merges 列表
-        merges.append(pair)
-
+        merges.append((vocab[max_pair[0][0]], vocab[max_pair[0][1]]))
+        freq_dict[max_pair[0]] = 0
         # 将合并后的字符对添加到 vocab
         vocab[current_id] = vocab[max_pair[0][0]] + vocab[max_pair[0][1]]
         current_id += 1
 
         # 更新 token，将频率最高的字符对替换为新合并的 token
         new_tokens = {}
-        for token in new_token_number:
+        for token,count in token_number.items():
             updated_token = []
             i = 0
-            while i < len(token) - 1:
+            number = len(token) - 1
+            while i < number:
                 pair = (token[i], token[i + 1])
                 if pair == max_pair[0]:
                     updated_token.append(current_id - 1)  # 替换为合并后的 token
-                    i += 2  # 跳过已经合并的字符对
+                    #此时需要更新的大小是(如果i > 0)，pair(token[i - 1],token[i])--，pair(token[i - 1],current_id - 1)++
+                    #还有就是(如果i+1 <number)，pair(token[i + 1],token[i + 2])--,pair(current_id - 1,token[i + 2])++
+                    if i > 0:
+                        freq_dict[(token[i - 1],token[i])]-=count
+                        freq_dict[(token[i - 1],current_id - 1)] = freq_dict.get((token[i - 1],current_id - 1), 0) + count
+                    if i+1 <number:
+                        freq_dict[(token[i + 1],token[i + 2])]-=count
+                        freq_dict[(current_id - 1,token[i + 2])] = freq_dict.get((current_id - 1,token[i + 2]), 0) + count
+                    i += 2  # 此时要更新freq_dict的大小
                 else:
                     updated_token.append(token[i])
                     i += 1
@@ -665,10 +643,11 @@ def run_train_bpe(
             if i < len(token):
                 updated_token.append(token[i])
 
-            new_tokens[tuple(updated_token)] = new_token_number[token]
+            new_tokens[tuple(updated_token)] = count
 
         # 更新 token_number 为新的 token
-        new_token_number = new_tokens
+        token_number = new_tokens
 
 
     return vocab, merges
+
