@@ -1,0 +1,42 @@
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python: pytest with uv",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "/root/.local/bin/uv", 
+//             "args": [
+//                 "run",
+//                 "pytest",
+//                 "tests/test_train_bpe.py",
+//                 "-vv"
+//             ],
+//             "console": "integratedTerminal",
+//             "env": {
+//                 "PYTHONPATH": "${workspaceFolder}"
+//             },
+//             "cwd": "${workspaceFolder}"
+//         }
+//     ]
+// }
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: pytest",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/test_train_bpe.py",
+                "-vv"
+            ],
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

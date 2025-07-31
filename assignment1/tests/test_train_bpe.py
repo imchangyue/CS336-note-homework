@@ -85,7 +85,7 @@ def test_train_bpe_special_tokens(snapshot):
     snapshot.assert_match(
         {
             "vocab_keys": set(vocab.keys()),
-            "vocab_values": set(vocab.values()),
             "merges": merges,
+            "vocab_values": set(vocab.values()),      
         },
     )
