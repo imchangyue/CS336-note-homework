@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import multiprocessing
 import os
 from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
@@ -9,8 +9,10 @@ import numpy.typing as npt
 import torch
 from torch import Tensor
 import regex as re
-from collections import Counter
+from collections import defaultdict, Counter
+import heapq
 from cs336_basics.pretokenization_example import find_chunk_boundaries
+from cs336_basics.Tokenizer import BPETokenizer
 def run_linear(
     d_in: int,
     d_out: int,
@@ -545,22 +547,23 @@ def get_tokenizer(
     merges: list[tuple[bytes, bytes]],
     special_tokens: list[str] | None = None,
 ) -> Any:
-    """Given a vocabulary, a list of merges, and a list of special tokens,
-    return a BPE tokenizer that uses the provided vocab, merges, and special tokens.
+    return BPETokenizer(vocab, merges, special_tokens)
+    # """Given a vocabulary, a list of merges, and a list of special tokens,
+    # return a BPE tokenizer that uses the provided vocab, merges, and special tokens.
 
-    Args:
-        vocab (dict[int, bytes]): The tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
-            to bytes (token bytes)
-        merges (list[tuple[bytes, bytes]]): BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
-            representing that <token1> was merged with <token2>.
-            Merges are ordered by order of creation.
-        special_tokens (list[str] | None): A list of string special tokens for the tokenizer. These strings will never
-            be split into multiple tokens, and will always be kept as a single token.
+    # Args:
+    #     vocab (dict[int, bytes]): The tokenizer vocabulary, a mapping from int (token ID in the vocabulary)
+    #         to bytes (token bytes)
+    #     merges (list[tuple[bytes, bytes]]): BPE merges. Each list item is a tuple of bytes (<token1>, <token2>),
+    #         representing that <token1> was merged with <token2>.
+    #         Merges are ordered by order of creation.
+    #     special_tokens (list[str] | None): A list of string special tokens for the tokenizer. These strings will never
+    #         be split into multiple tokens, and will always be kept as a single token.
 
-    Returns:
-        A BPE tokenizer that uses the provided vocab, merges, and special tokens.
-    """
-    raise NotImplementedError
+    # Returns:
+    #     A BPE tokenizer that uses the provided vocab, merges, and special tokens.
+    # """
+    # raise NotImplementedError
 
 
 
