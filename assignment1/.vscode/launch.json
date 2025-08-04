@@ -29,7 +29,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "tests/test_train_bpe.py",
+                "tests/test_tokenizer.py",
                 "-vv"
             ],
             "console": "integratedTerminal",
