@@ -1,27 +1,96 @@
-from typing import List, Tuple, Optional, Any, Iterator
-from collections.abc import Iterable
-# import re
+from typing import List, Tuple, Optional, Any, Iterator,Iterable, Iterator, Dict
+import os
 import regex as re
+from array import array
+import heapq
+from collections import defaultdict, Counter
+from functools import total_ordering
+import json
+
+GPT2_SPLIT_PATTERN = (
+    r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+)
+
+
+def pretokenize(text: str) -> list[bytes]:
+    """使用GPT-2的正则表达式将文本分割成“词块”，并编码为bytes。 This step is very important!!!! Otherwise the b'a\n\nb' will be transfer into 'a' '\n\n' 'b' instead of 'a' '\n' '\n' 'b'"""
+    str_tokens = re.findall(GPT2_SPLIT_PATTERN, text)
+    byte_tokens = [s.encode("utf-8") for s in str_tokens]
+    return byte_tokens
+
+
+GPT2_RE = re.compile(GPT2_SPLIT_PATTERN)
+def iter_pretokenize(text: str) -> Iterator[bytes]:
+    """按 GPT-2 正则逐个产生字节串，零内存列表。"""
+    for m in GPT2_RE.finditer(text):
+        yield m.group(0).encode("utf-8")
 class BPETokenizer:
     def __init__(self, vocab: dict[int, bytes], merges: List[Tuple[bytes, bytes]], special_tokens: Optional[List[str]] = None):
-        # 初始化词汇表、合并规则和特殊 tokens
+        # Initialize vocabulary, merges, and special tokens
         self.vocab = vocab
         self.merges = merges
         self.special_tokens = special_tokens or []
-        
-        # 如果有特殊token，确保它们被加到词汇表中
+        self.merges_rank = {pair: i for i, pair in enumerate(merges)}
+        self.stoi = {v: k for k, v in vocab.items()}
+        self.itos = vocab
+        self.pair2new = {(p1, p2): self.stoi[p1 + p2] for (p1, p2) in merges}
+        # Ensure special tokens are added to the vocab
         for token in self.special_tokens:
             token_bytes = token.encode()
             if token_bytes not in self.vocab.values():
-                new_id = max(self.vocab.keys()) + 1  # 创建新的 ID
+                new_id = max(self.vocab.keys()) + 1  # Create new ID
                 self.vocab[new_id] = token_bytes
-        
-        # 预处理合并规则
+
+        # Preprocess merges into a dictionary for quick lookup
         self.merge_dict = {pair: i for i, pair in enumerate(self.merges)}
+        self.vocab_bytes = {token: id for id, token in self.vocab.items()}
+    def _encode_ordinary_text(self, text_bytes: bytes) -> list[int]:
+        if not text_bytes:
+            return []
 
+        try:
+            text = text_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = text_bytes.decode("utf-8", errors="replace")
 
+        ids_out = array("H")  # uint16 足够 ≤ 65k vocab
+        pair_rank = self.merges_rank
+        pair2new = self.pair2new
+        byte2id = self.stoi  # 局部 alias，加速
+
+        # 逐个“词块”处理，避免一次性 list
+        for word_b in iter_pretokenize(text):
+            token_ids = array("H", (byte2id[bytes([b])] for b in word_b))
+
+            # b. 就地合并：“greedy smallest-rank merge”
+            while True:
+                best_rank = 1000000000
+                best_pos = -1
+                # ——— 找当前序列里 rank 最小的 pair ———
+                for i in range(len(token_ids) - 1):
+                    r = pair_rank.get( # ——— 替换 best_pos & best_pos+1 为新的 token ———
+                        (self.itos[token_ids[i]], self.itos[token_ids[i + 1]]),
+                        1000000000,
+                    )
+                    if r < best_rank:
+                        best_rank, best_pos = r, i
+                if best_pos == -1:
+                    break
+                
+                new_id = pair2new[
+                    (self.itos[token_ids[best_pos]], self.itos[token_ids[best_pos + 1]])
+                ]
+                token_ids[best_pos : best_pos + 2] = array("H", [new_id])
+
+            ids_out.extend(token_ids)
+
+        # array → list
+        return ids_out.tolist()
     def encode(self, text: str) -> List[int]:
-        """编码函数，将文本转换为 token IDs，支持多字节 token 和 special tokens"""
+        if text == '':
+            return [] 
+        """Encode a string into a list of token IDs using BPE"""
+        # Pre-tokenization: Split by spaces
         if self.special_tokens:
             sorted_special_tokens = sorted(self.special_tokens, key=len, reverse=True)
 
@@ -35,31 +104,15 @@ class BPETokenizer:
 
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         token_ids = []
-        max_token_length = max(len(token) for key,token in self.vocab.items())
         for part in parts:
             if part in self.special_tokens:
                 # 直接编码 special token
                 token_ids.append(self.get_token_id_from_bytes(part.encode('utf-8')))
             else:
-                sub_tokens = re.findall(PAT, part)
-                for token in sub_tokens:
-                    encoded_bytes = token.encode('utf-8')
-                    start = 0
-                    while start < len(encoded_bytes):
-                        max_possible_length = min(max_token_length, len(encoded_bytes) - start)
-                        found = False
-                        for length in range(max_possible_length, 0, -1):
-                            candidate_bytes = encoded_bytes[start:start + length]
-                            if candidate_bytes in self.vocab.values():
-                                token_ids.append(self.get_token_id_from_bytes(candidate_bytes))
-                                start += length
-                                found = True
-                                break
-                        if not found:
-                            token_ids.append(self.get_token_id_from_bytes(b""))  # 或使用 UNK
-                            start += 1
-
+                token_ids.extend(self._encode_ordinary_text(part.encode("utf-8")))
+                
         return token_ids
+
 
     
     def decode(self, ids: List[int]) -> str:
