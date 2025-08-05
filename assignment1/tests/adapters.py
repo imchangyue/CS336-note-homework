@@ -13,6 +13,11 @@ from collections import defaultdict, Counter
 import heapq
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from cs336_basics.Tokenizer import BPETokenizer
+from cs336_basics.Linear import Linear
+from cs336_basics.Embedding import Embedding
+from cs336_basics.RMSNorm import RMSNorm
+from cs336_basics.SwiGLUFeedForward import SwiGLUFeedForward
+from cs336_basics.RoPE import RotaryPositionEmbedding
 def run_linear(
     d_in: int,
     d_out: int,
@@ -31,8 +36,9 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    linear_layer = Linear(d_in, d_out)
+    linear_layer.W.data = weights
+    return linear_layer(in_features)
 
 
 def run_embedding(
@@ -54,7 +60,9 @@ def run_embedding(
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
 
-    raise NotImplementedError
+    embedding_layer = Embedding(vocab_size, d_model)
+    embedding_layer.embedding_matrix.data = weights
+    return embedding_layer(token_ids)
 
 
 def run_swiglu(
@@ -79,14 +87,16 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    # Example:
-    # If your state dict keys match, you can use `load_state_dict()`
-    # swiglu.load_state_dict(weights)
-    # You can also manually assign the weights
-    # swiglu.w1.weight.data = w1_weight
-    # swiglu.w2.weight.data = w2_weight
-    # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLUFeedForward(d_model, d_ff)
+    
+    # 加载权重 (注意转置以匹配类内部的维度)
+    with torch.no_grad():
+        swiglu.W1.copy_(w1_weight.T)  # [d_ff,d_model] -> [d_model,d_ff]
+        swiglu.W2.copy_(w2_weight.T)  # [d_model,d_ff] -> [d_ff,d_model]
+        swiglu.W3.copy_(w3_weight.T)  # [d_ff,d_model] -> [d_model,d_ff]
+    
+    # 调用forward方法
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -203,7 +213,20 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = RotaryPositionEmbedding(dim=d_k, base=theta)
+    
+    # Ensure token_positions is on the same device as in_query_or_key
+    token_positions = token_positions.to(in_query_or_key.device)
+    
+    # Precompute cos and sin values for all possible positions
+    all_cos, all_sin = rope._compute_rotary_emb(in_query_or_key, max_seq_len)
+    
+    # Select the corresponding cos and sin values based on token_positions
+    selected_cos = all_cos[token_positions]  # Index based on token positions
+    selected_sin = all_sin[token_positions]  # Index based on token positions
+    
+    # Apply rotary embedding using the selected cos and sin
+    return rope.apply_rotary_emb(in_query_or_key, selected_cos, selected_sin)
 
 
 def run_transformer_block(
@@ -381,7 +404,14 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+    # 初始化 RMSNorm 模块
+    rmsnorm = RMSNorm(d_model=d_model, eps=eps)
+    
+    # 将增益参数设置为给定的权重
+    rmsnorm.gain.data = weights
+    
+    # 执行 RMSNorm 操作
+    return rmsnorm(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
@@ -434,7 +464,21 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    max_vals, _ = torch.max(in_features, dim=dim, keepdim=True)
+    stabilized_in_features = in_features - max_vals
+    
+    # Calculate the exponentiated values
+    exp_vals = torch.exp(stabilized_in_features)
+    
+    # Sum the exponentiated values along the specified dimension
+    exp_sum = torch.sum(exp_vals, dim=dim, keepdim=True)
+    
+    # Clamp the sum to avoid dividing by zero
+    exp_sum = torch.clamp(exp_sum, min=1e-8)
+    
+    # Return the softmax normalized values
+    return exp_vals / exp_sum
+
 
 
 def run_cross_entropy(
