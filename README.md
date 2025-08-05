@@ -6,3 +6,8 @@
 #### 7.29
  - working on assignment1
  - studing lecture 3
+
+
+#### 8.5
+ - working on assignment1
+ - studing lecture 3
