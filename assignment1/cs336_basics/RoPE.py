@@ -1,92 +1,69 @@
 import torch
 import torch.nn as nn
-import math
+from einops import rearrange
+from jaxtyping import Float, Int
+from torch import Tensor
 
-class RotaryPositionEmbedding(nn.Module):
-    def __init__(self, dim: int, base: float = 10000.0):
-        """
-        RoPE旋转位置编码实现
-        Args:
-            dim: 嵌入维度(必须是偶数)
-            base: 用于计算角度的基数Θ
-        """
+class RotaryPositionalEmbedding(nn.Module):
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
         super().__init__()
-        assert dim % 2 == 0, "维度必须是偶数"
         
-        self.dim = dim
-        self.base = base
+        # RoPE 论文中的公式，用于计算旋转频率
+        freqs = 1.0 / (theta ** (torch.arange(0, d_k, 2).float() / d_k))
         
-        # 预计算并缓存所有可能的位置和维度对应的sin/cos值
-        self.register_buffer("inv_freq", None, persistent=False)
-        self._precompute_freqs()
+        # 为每个位置计算旋转角度
+        t = torch.arange(max_seq_len, device=device)
+        freqs_flat = torch.outer(t, freqs).to(device)
 
-    def _precompute_freqs(self):
-        """预计算频率张量"""
-        # 计算1/Θ^(2k/d) for k ∈ [0, d/2-1]
-        theta = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float() / self.dim))
-        self.register_buffer("inv_freq", theta, persistent=False)
+        # 预计算 cos 和 sin 值
+        cos_vals = torch.cos(freqs_flat) # shape: [max_seq_len, d_k / 2]
+        sin_vals = torch.sin(freqs_flat) # shape: [max_seq_len, d_k / 2]
 
-    def _compute_rotary_emb(self, x: torch.Tensor, seq_len: int):
+        # 将 cos 和 sin 扩展到 d_k 维度
+        cos_vals = torch.repeat_interleave(cos_vals, 2, dim=-1) # shape: [max_seq_len, d_k]
+        sin_vals = torch.repeat_interleave(sin_vals, 2, dim=-1) # shape: [max_seq_len, d_k]
+
+        # 将预计算的值注册为 buffer，而不是参数
+        self.register_buffer('cos_vals', cos_vals, persistent=False)
+        self.register_buffer('sin_vals', sin_vals, persistent=False)
+        
+    def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         """
-        计算旋转位置编码
         Args:
-            x: 输入张量 [..., seq_len, dim]
-            seq_len: 序列长度
+            x (torch.Tensor): 输入张量，形状为 (..., seq_len, d_k)
+            token_positions (torch.Tensor): 令牌位置张量，形状为 (..., seq_len)
         Returns:
-            (cosθ, sinθ) 对
+            torch.Tensor: 经过 RoPE 旋转后的张量，形状与 x 相同
         """
-        # 生成位置序列 [0, 1, ..., seq_len-1]
-        t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)  # [seq_len]
+        # 1. 重塑 x 以便后续操作。
+        # 这里可以使用 rearrange 或手动实现，但为了通用性，我们直接按位置索引
         
-        # 计算外积得到位置*频率矩阵 [seq_len, dim/2]
-        freqs = torch.einsum('i,j->ij', t, self.inv_freq)  # [seq_len, dim/2]
+        # 确保 cos 和 sin 缓冲区的维度与 x 匹配，以便广播
+        # 注意: token_positions 可能是多维的
+        seq_len = x.shape[-2]
         
-        # 重复两次以便后续处理 [seq_len, dim]
-        freqs = freqs.repeat_interleave(2, dim=-1)  # [seq_len, dim]
-        
-        # 计算cos和sin
-        cos = torch.cos(freqs)  # [seq_len, dim]
-        sin = torch.sin(freqs)  # [seq_len, dim]
-        
-        return cos, sin
+        # 使用 token_positions 从预计算的 cos 和 sin 中选择对应的值
+        # 这里假设 token_positions 的形状可以广播到 x 的前几个维度
+        cos_pos = self.cos_vals[token_positions]
+        sin_pos = self.sin_vals[token_positions]
 
-    def rotate_half(self, x: torch.Tensor):
-        """将输入张量的后一半维度旋转"""
-        x1, x2 = x.chunk(2, dim=-1)
-        return torch.cat((-x2, x1), dim=-1)
-
-    def apply_rotary_emb(
-        self, 
-        x: torch.Tensor, 
-        cos: torch.Tensor, 
-        sin: torch.Tensor
-    ) -> torch.Tensor:
-        """
-        应用旋转位置编码
-        Args:
-            x: 输入张量 [..., seq_len, dim]
-            cos: cos值 [seq_len, dim]
-            sin: sin值 [seq_len, dim]
-        Returns:
-            旋转后的张量 [..., seq_len, dim]
-        """
-        # 旋转公式: q' = q * cosθ + rotate_half(q) * sinθ
-        return (x * cos) + (self.rotate_half(x) * sin)
-
-    def forward(self, x: torch.Tensor):
-        """
-        前向传播
-        Args:
-            x: 输入张量 [batch_size, seq_len, dim]
-        Returns:
-            旋转后的张量 [batch_size, seq_len, dim]
-        """
-        seq_len = x.size(1)
-        cos, sin = self._compute_rotary_emb(x, seq_len)
+        # 2. 将 x 向量分成两半进行旋转
+        x_even = x[..., 0::2]
+        x_odd = x[..., 1::2]
         
-        # 确保cos/sin与x的维度匹配
-        cos = cos.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len, dim]
-        sin = sin.unsqueeze(0).unsqueeze(0)  # [1, 1, seq_len, dim]
+        # 将 cos 和 sin 的维度与 x_even/x_odd 匹配
+        cos_pos_half = cos_pos[..., 0::2]
+        sin_pos_half = sin_pos[..., 0::2]
         
-        return self.apply_rotary_emb(x, cos, sin)
-
+        # 3. 应用旋转
+        # 旋转后的偶数索引元素 = 偶数元素 * cos - 奇数元素 * sin
+        x_even_rotated = x_even * cos_pos_half - x_odd * sin_pos_half
+        # 旋转后的奇数索引元素 = 偶数元素 * sin + 奇数元素 * cos
+        x_odd_rotated = x_even * sin_pos_half + x_odd * cos_pos_half
+        
+        # 4. 将旋转后的两半重新合并
+        result = torch.empty_like(x)
+        result[..., 0::2] = x_even_rotated
+        result[..., 1::2] = x_odd_rotated
+        
+        return result

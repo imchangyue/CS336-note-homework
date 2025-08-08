@@ -30,4 +30,7 @@ class Embedding(nn.Module):
             torch.Tensor: The embeddings for the input token IDs, shape (batch_size, sequence_length, embedding_dim)
         """
         # Use token_ids to index into the embedding matrix and get the embeddings
+        print("Token IDs shape:", token_ids.shape)
+        print("Embedding matrix shape:", self.embedding_matrix.shape)
+        
         return self.embedding_matrix[token_ids]
