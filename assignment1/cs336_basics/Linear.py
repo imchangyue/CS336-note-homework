@@ -30,8 +30,5 @@ class Linear(nn.Module):
             torch.Tensor: the transformed output of shape (batch_size, out_features)
         """
         # Perform the linear transformation (W is of shape [out_features, in_features])
-
-        
-        # Reshape the output back to (batch_size, seq_len, out_features)
         return einsum(x, self.W, 'b s i, o i -> b s o')
 
