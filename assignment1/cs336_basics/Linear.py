@@ -4,14 +4,6 @@ import torch.nn.init as init
 from einops import einsum
 class Linear(nn.Module):
     def __init__(self, in_features, out_features, device=None, dtype=None):
-        """
-        Constructs a linear transformation module (without bias).
-        Args:
-            in_features: int, final dimension of the input.
-            out_features: int, final dimension of the output.
-            device: torch.device | None, the device to store the parameters on.
-            dtype: torch.dtype | None, the data type of the parameters.
-        """
         super(Linear, self).__init__()
         
         # Initialize weight matrix W (d_out x d_in)

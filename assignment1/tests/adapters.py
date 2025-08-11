@@ -36,7 +36,7 @@ def run_embedding(
     vocab_size: int,
     d_model: int,
     weights: Float[Tensor, " vocab_size d_model"],
-    token_ids: Int[Tensor, " ..."],
+    token_ids: Int[Tensor, " ..."], #……代表的是"batch,sequence_length"
 ) -> Float[Tensor, " ... d_model"]:
     embedding_layer = Embedding(vocab_size, d_model)
     embedding_layer.embedding_matrix.data = weights
@@ -834,7 +834,7 @@ def get_tokenizer(
 
 
 
-
+# 我现在考虑在计算相邻两个byte的频率的时候，把token的id也存下来
 def run_train_bpe(
     input_path: str | os.PathLike,
     vocab_size: int,
@@ -869,13 +869,18 @@ def run_train_bpe(
     freq_dict = {}
     merges = []
     freq_dict = Counter()  # 重新统计频率
+    # pair_to_token_ids = {}
     for token,count in token_number.items():
         number = len(token) - 1
         for i in range (number):
             pair = (token[i], token[i + 1])  # 生成字节对
             freq_dict[pair] += count # 累加频率
+            # if pair not in pair_to_token_ids:
+            #     pair_to_token_ids[pair] = set()
+            # pair_to_token_ids[pair].add(i)  # 保存字节对对应的 token id
     # 现在是初始的累加频率
     while current_id < vocab_size:
+        print(f"Current vocab size: {len(vocab)}, current_id: {current_id}, merges: {len(merges)}")
         # 找到频率最高的字符对
         max_pair = max(freq_dict.items(), key=lambda x: (x[1], vocab[x[0][0]], vocab[x[0][1]]))
         # 将最高频的字符对添加到 merges 列表

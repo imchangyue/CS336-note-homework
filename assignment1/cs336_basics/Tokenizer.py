@@ -102,7 +102,6 @@ class BPETokenizer:
         else:
             parts = [text]
 
-        PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         token_ids = []
         for part in parts:
             if part in self.special_tokens:
@@ -114,6 +113,15 @@ class BPETokenizer:
         return token_ids
 
 
+#"hello" -> "h":以h开头的100个bytes都相符->错
+#                以h开头的99个bytes都相符->错
+#              # 以h开头的98个bytes都相符->对
+#  这个方法是错的
+#错在哪里："hello" ->"he" 和 "llo" 不能继续合并成hello
+#         "hello" ->"h" 和 "ello"可以继续合并成hello
+
+# 从merge的顺序进行encode 对:he 和 el谁先合并的问题
+# 先从原来训练的顺序开始合并，自然可以合并成一样
     
     def decode(self, ids: List[int]) -> str:
         """解码函数，将 token IDs 转换回文本"""
