@@ -21,3 +21,9 @@
  - recover assignment1
  - finished lecture4
  - working on lecture5
+
+
+#### 8.11
+ - finished lecture5
+ - working on lecture6
+ - working on assignment2
