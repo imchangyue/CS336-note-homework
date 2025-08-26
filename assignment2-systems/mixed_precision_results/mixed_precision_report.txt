@@ -1,0 +1,17 @@
+混合精度基准测试报告
+生成时间: Fri Aug 22 12:05:13 UTC 2025
+========================================
+
+测试配置：
+- 模型尺寸: small medium large xl 2.7B
+- 上下文长度: 128 256 512 1024
+- 测试模式: forward, forward_backward
+
+平均加速比统计（按模型尺寸）：
+small     : N/A
+medium    : N/A
+large     : N/A
+xl        : N/A
+2.7B      : N/A
+
+详细结果请查看: mixed_precision_results.csv
