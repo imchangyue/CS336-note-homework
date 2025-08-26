@@ -33,4 +33,11 @@
  - finished lecture6
  - working on lecture7
 
+
+#### 8.25
+ - finished lecture7
+ - working on assignment2
+
+#### 8.26
+ - 
  
