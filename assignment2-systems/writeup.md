@@ -218,3 +218,295 @@ Medium模型，context length 256-512：~1.7-2.0x加速
 ![alt text](image-11.png)
 答案是`transformer_performance_analysis.html`
 ![alt text](image-12.png)
+
+
+### problem
+与tests文件夹相关的问题全部在test文件夹下解决了
+
+### problem
+![alt text](image-13.png)
+代码在`assignment2-systems/cs336_systems/1.2/test_triton_speed.py`,结果在`assignment2-systems/test_triton.csv`
+
+
+### problem
+![alt text](image-14.png)
+代码和结果分别是`assignment2-systems/cs336_systems/2/benchmark_script.py`,`assignment2-systems/cs336_systems/2/benchmark_results.csv`
+
+
+### problem
+![alt text](image-15.png)
+代码在`assignment2-systems/cs336_systems/2/naive_ddp.py`,结果为
+```bash
+root@1ee5b610c063:/home/code_backup/code/cs336# python3 assignment2-systems/cs336_systems/2/naive_ddp.py
+Starting naive DDP implementation test...
+World size: 2, Epochs: 3, Batch size: 16, Learning rate: 0.01
+
+Running simulated DDP training...
+Epoch 1/3, Loss: 0.980953
+Epoch 2/3, Loss: 0.975790
+Epoch 3/3, Loss: 0.973346
+
+Running single process training for comparison...
+Running single process training for comparison
+Epoch 1/3, Loss: 0.980953
+Epoch 2/3, Loss: 0.975790
+Epoch 3/3, Loss: 0.973346
+
+Comparing model parameters:
+✓ net.0.weight: Parameters match (max diff: 1.49e-08, mean diff: 4.45e-10)
+✓ net.0.bias: Parameters match (max diff: 1.49e-08, mean diff: 1.16e-09)
+✓ net.2.weight: Parameters match (max diff: 1.49e-08, mean diff: 2.51e-10)
+✓ net.2.bias: Parameters match (max diff: 1.49e-08, mean diff: 1.43e-09)
+✓ net.4.weight: Parameters match (max diff: 1.49e-08, mean diff: 2.36e-09)
+✓ net.4.bias: Parameters match (max diff: 0.00e+00, mean diff: 0.00e+00)
+
+Overall maximum difference: 1.49e-08
+✅ All parameters within tolerance!
+
+✅ SUCCESS: DDP implementation produces the same results as single-process training!
+```
+
+
+### problem
+![alt text](image-16.png)
+XL模型太大了，我跑不起来，所以我设置了一个比较小的模型参数
+Hidden dim: 1024 → 512 (减少75%内存)
+Layers: 24 → 12 (减少50%参数)
+Attention heads: 16 → 8
+Sequence length: 1024 → 512 (减少75%激活内存)
+Batch size: 2 → 1 per GPU
+Vocab size: 50257 → 32000
+
+
+代码在`assignment2-systems/cs336_systems/2/naive_ddp_benchmarking.py`
+输出的结果
+```bash
+root@1ee5b610c063:/home/code_backup/code/cs336# python3 assignment2-systems/cs336_systems/2/naive_ddp_benchmarking.py
+Starting Naive DDP Benchmarking (8GB GPU Optimized)
+============================================================
+This benchmark simulates distributed training communication overhead
+while running on a single process to avoid environment issues.
+Configuration has been optimized for 8GB GPU memory.
+============================================================
+
+Detected GPU: NVIDIA GeForce RTX 4060 Laptop GPU
+GPU Memory: 8.6 GB
+ℹ️  GPU memory is limited. Using scaled-down model configuration.
+
+Using device: cuda
+GPU Memory: 8.6 GB
+Creating Language Model (optimized for 8GB GPU)...
+Model Configuration (Adapted for 8GB GPU):
+  Parameters: 70,859,776
+  Model size: ~0.28 GB
+  Hidden dimension: 512 (scaled down from 1024)
+  Layers: 12 (scaled down from 24)
+  Attention heads: 8 (scaled down from 16)
+  Sequence length: 512 (scaled down from 1024)
+  Note: This is a smaller model to fit 8GB GPU memory
+  The communication overhead patterns will be similar to XL model
+
+Benchmarking Setup:
+  World size: 2 (simulated)
+  Batch size per GPU: 1
+  Effective batch size: 2
+  Benchmark steps: 10
+
+Warming up...
+Gradient checkpointing not available
+Step  1/10: Total: 0.125s, Forward: 0.026s, Backward: 0.046s, Comm: 0.019s (15.4%), Loss: 10.4848
+Step  2/10: Total: 0.122s, Forward: 0.024s, Backward: 0.045s, Comm: 0.019s (15.8%), Loss: 10.4405
+Step  3/10: Total: 0.117s, Forward: 0.024s, Backward: 0.043s, Comm: 0.020s (17.3%), Loss: 10.5049
+Step  4/10: Total: 0.126s, Forward: 0.023s, Backward: 0.043s, Comm: 0.030s (23.9%), Loss: 10.4757
+Step  5/10: Total: 0.113s, Forward: 0.023s, Backward: 0.043s, Comm: 0.017s (15.3%), Loss: 10.4882
+Step  6/10: Total: 0.113s, Forward: 0.024s, Backward: 0.043s, Comm: 0.017s (15.5%), Loss: 10.4688
+Step  7/10: Total: 0.117s, Forward: 0.023s, Backward: 0.043s, Comm: 0.022s (18.3%), Loss: 10.4864
+Step  8/10: Total: 0.122s, Forward: 0.024s, Backward: 0.043s, Comm: 0.025s (20.6%), Loss: 10.4681
+Step  9/10: Total: 0.114s, Forward: 0.023s, Backward: 0.043s, Comm: 0.018s (16.1%), Loss: 10.4918
+Step 10/10: Total: 0.121s, Forward: 0.024s, Backward: 0.043s, Comm: 0.024s (19.8%), Loss: 10.4755
+
+================================================================================
+NAIVE DDP BENCHMARKING RESULTS
+================================================================================
+
+Model Configuration:
+  Model: XL (512d, 12 layers, 8 heads)
+  Parameters: 70,859,776
+  Model size: ~0.28 GB
+  Sequence length: 512
+
+Training Configuration:
+  Setup: Single-node, 2 GPUs (simulated)
+  Batch size per GPU: 1
+  Effective batch size: 2
+  Optimizer: AdamW
+
+Timing Results (averaged over 10 steps):
+  Total time per step:     0.1192 ± 0.0045 seconds
+    - Forward pass:        0.0239 ± 0.0008 seconds (20.0%)
+    - Backward pass:       0.0435 ± 0.0010 seconds (36.5%)
+    - Communication:       0.0213 ± 0.0039 seconds (17.9%)
+    - Optimizer step:      0.0266 ± 0.0017 seconds (22.3%)
+
+Communication Analysis:
+  Average gradient data transferred: 283.4 MB per step
+  Communication overhead: 17.9% of total step time
+  ⚠️  Moderate communication overhead
+
+Performance Metrics:
+  Throughput: 16.8 samples/second
+  Tokens/second: 8593
+  Estimated training time for 1M tokens: 0.0 hours
+
+================================================================================
+ANALYSIS & RECOMMENDATIONS
+================================================================================
+🔍 High Communication Overhead Detected:
+   - Individual parameter all-reduce is inefficient
+   - Consider gradient bucketing/fusion
+   - Use optimized DDP implementations (e.g., PyTorch DDP)
+   - Consider larger batch sizes to amortize communication cost
+
+📊 Detailed results saved to 'naive_ddp_benchmark_results.json'
+
+================================================================================
+SINGLE GPU COMPARISON BENCHMARK
+================================================================================
+Single GPU training with batch size 2...
+
+Single GPU Results:
+  Average step time: 0.0969 ± 0.0013 seconds
+  Forward pass:      0.0239 ± 0.0006 seconds
+  Backward pass:     0.0451 ± 0.0006 seconds
+  Optimizer step:    0.0272 ± 0.0004 seconds
+  Throughput:        20.6 samples/second
+
+================================================================================
+FINAL COMPARISON
+================================================================================
+DDP (simulated 2 GPUs):  16.8 samples/sec
+Single GPU:              20.6 samples/sec
+Speedup ratio:           0.81x
+Communication overhead:  17.9%
+❌ Poor DDP scaling efficiency - high communication overhead!
+
+🎯 Key Finding: Communication overhead is 17.9% of total training time
+   This demonstrates the importance of optimizing gradient communication in DDP!
+
+📝 Note: Results are from a scaled-down model due to 8GB GPU limitation.
+   The communication overhead patterns would be similar for XL models.
+   For the original XL model (1024d, 24L), communication overhead would likely be higher.
+root@1ee5b610c063:/home/code_backup/code/cs336# 
+```
+
+**得到的结论：通信开销是最大的瓶颈。在你的“朴素”DDP 实现中，通信（all-reduce 梯度）占了总训练时间的 17.9%，这是一个相当高的比例。训练效率低下。由于高昂的通信成本，模拟 DDP 的训练速度（16.8 样本/秒）反而比单 GPU 训练（20.6 样本/秒）还要慢。这导致了 0.81x 的速度比，表明 DDP 的性能没有得到有效提升，甚至还下降了。**
+
+
+### problem
+![alt text](image-17.png)
+代码在`assignment2-systems/cs336_systems/2/minimal_ddp_flat_benchmarking.py`
+结果
+```bash
+root@1ee5b610c063:/home/code_backup/code/cs336# python3 assignment2-systems/cs336_systems/2/minimal_ddp_flat_benchmarking.py
+DDP Gradient Batching Benchmark
+==================================================
+Comparing individual vs. batched gradient communication
+This implements the improvement described in §2.3.1
+==================================================
+
+Using device: cuda
+GPU Memory: 8.6 GB
+Creating Language Model...
+Model Configuration:
+  Parameters: 70,859,776
+  Model size: ~0.28 GB
+  Configuration: 512d, 12L, 8H
+
+Benchmarking Setup:
+  World size: 2 (simulated)
+  Batch size per GPU: 1
+  Effective batch size: 2
+  Benchmark steps: 12
+
+================================================================================
+BENCHMARKING INDIVIDUAL GRADIENT COMMUNICATION (Naive Approach)
+================================================================================
+Individual Step  1/12: Total: 0.1280s, Comm: 0.0329s (25.7%), Calls: 149, Loss: 10.4769
+Individual Step  2/12: Total: 0.1274s, Comm: 0.0307s (24.1%), Calls: 149, Loss: 10.4878
+Individual Step  3/12: Total: 0.1306s, Comm: 0.0289s (22.2%), Calls: 149, Loss: 10.4635
+Individual Step  4/12: Total: 0.1204s, Comm: 0.0235s (19.6%), Calls: 149, Loss: 10.4650
+Individual Step  5/12: Total: 0.1302s, Comm: 0.0337s (25.9%), Calls: 149, Loss: 10.4936
+Individual Step  6/12: Total: 0.1281s, Comm: 0.0325s (25.3%), Calls: 149, Loss: 10.4889
+Individual Step  7/12: Total: 0.1167s, Comm: 0.0212s (18.1%), Calls: 149, Loss: 10.4993
+Individual Step  8/12: Total: 0.1296s, Comm: 0.0334s (25.8%), Calls: 149, Loss: 10.5067
+Individual Step  9/12: Total: 0.1204s, Comm: 0.0239s (19.9%), Calls: 149, Loss: 10.4926
+Individual Step 10/12: Total: 0.1219s, Comm: 0.0263s (21.6%), Calls: 149, Loss: 10.4901
+Individual Step 11/12: Total: 0.1297s, Comm: 0.0338s (26.1%), Calls: 149, Loss: 10.4777
+Individual Step 12/12: Total: 0.1302s, Comm: 0.0338s (26.0%), Calls: 149, Loss: 10.4910
+
+================================================================================
+BENCHMARKING BATCHED GRADIENT COMMUNICATION (Improved Approach)
+================================================================================
+Batched Step  1/12: Total: 0.1100s, Comm: 0.0147s (13.4%), Calls: 1, Loss: 10.4902
+Batched Step  2/12: Total: 0.1120s, Comm: 0.0148s (13.2%), Calls: 1, Loss: 10.4789
+Batched Step  3/12: Total: 0.1144s, Comm: 0.0148s (13.0%), Calls: 1, Loss: 10.4859
+Batched Step  4/12: Total: 0.1122s, Comm: 0.0149s (13.3%), Calls: 1, Loss: 10.4909
+Batched Step  5/12: Total: 0.1121s, Comm: 0.0150s (13.3%), Calls: 1, Loss: 10.4799
+Batched Step  6/12: Total: 0.1109s, Comm: 0.0147s (13.3%), Calls: 1, Loss: 10.4748
+Batched Step  7/12: Total: 0.1109s, Comm: 0.0148s (13.3%), Calls: 1, Loss: 10.4917
+Batched Step  8/12: Total: 0.1106s, Comm: 0.0150s (13.6%), Calls: 1, Loss: 10.4679
+Batched Step  9/12: Total: 0.1099s, Comm: 0.0148s (13.5%), Calls: 1, Loss: 10.4587
+Batched Step 10/12: Total: 0.1112s, Comm: 0.0149s (13.4%), Calls: 1, Loss: 10.4904
+Batched Step 11/12: Total: 0.1111s, Comm: 0.0151s (13.6%), Calls: 1, Loss: 10.5017
+Batched Step 12/12: Total: 0.1119s, Comm: 0.0147s (13.2%), Calls: 1, Loss: 10.5052
+
+================================================================================
+COMPARISON RESULTS
+================================================================================
+
+Model Configuration:
+  Parameters: 70,859,776
+  Model size: ~0.28 GB
+  World size: 2 GPUs
+  Batch size per GPU: 1
+
+Individual Gradient Communication (Naive §2.2):
+  Average step time:        0.1261 ± 0.0046 seconds
+  Average communication:    0.0296 ± 0.0045 seconds (23.4%)
+  Communication calls:      149 per step
+
+Batched Gradient Communication (Improved §2.3.1):
+  Average step time:        0.1114 ± 0.0012 seconds
+  Average communication:    0.0149 ± 0.0001 seconds (13.3%)
+  Communication calls:      1 per step
+
+============================================================
+PERFORMANCE IMPROVEMENTS
+============================================================
+Step time improvement:        +11.6%
+Communication time reduction: +49.7%
+Throughput improvement:       +13.2%
+Communication calls reduced:  149 → 1 (-148)
+
+Throughput Comparison:
+  Individual approach: 15.9 samples/sec
+  Batched approach:    17.9 samples/sec
+
+============================================================
+ANALYSIS
+============================================================
+✅ Significant improvement from gradient batching!
+
+🔍 Key Findings:
+• Batching reduces communication calls from 149 to 1
+• Communication overhead: 23.4% → 13.3%
+• The improvement demonstrates why modern DDP implementations use gradient bucketing
+
+📊 Detailed results saved to 'ddp_batching_comparison.json'
+
+🎯 CONCLUSION:
+Batching gradients into a single all-reduce call reduces communication
+overhead by eliminating per-parameter startup costs, demonstrating why
+modern DDP implementations use gradient bucketing strategies.
+root@1ee5b610c063:/home/code_backup/code/cs336# 
+```
