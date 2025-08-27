@@ -39,5 +39,8 @@
  - working on assignment2
 
 #### 8.26
- - 
- 
+ - finished lecture8
+ - working on assignment2
+
+#### 8.27
+ - working on assignment2
