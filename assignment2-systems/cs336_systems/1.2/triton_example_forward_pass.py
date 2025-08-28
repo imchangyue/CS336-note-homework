@@ -3,10 +3,10 @@ import triton
 import triton.language as tl
 from einops import rearrange # 示例中使用了einops, 这里补充导入以便代码完整运行
 
-# 这是一个工具函数，用于计算向上取整的除法
-# Triton 0.x/1.x 版本中常用，在 2.x 后内置了 tl.cdiv
+
 def cdiv(a, b):
-    return (a + b - 1) // b
+    """向上取整除法"""
+    return -(-a // b)
 
 # ------------------------------------------------------------------
 # Part 1: Triton Kernel - 真正的GPU计算核心
@@ -166,8 +166,24 @@ class WeightedSumFunc(torch.autograd.Function):
         # --- 4. 返回结果 ---
         # 将计算结果从扁平的形状恢复为原始期望的输出形状并返回。
         return y.view(input_shape[:-1])
-    
-    # backward pass的实现没有在原文中提供，这里省略
-    # @staticmethod
-    # def backward(ctx, grad_output):
-    #     ...
+
+def main():
+    # 测试Triton实现的前向传播
+    torch.manual_seed(0)
+    x = torch.randn(32, 128, device='cuda') # 示例输入
+    weight = torch.randn(128, device='cuda') # 示例权重
+
+    # 使用自定义的Triton操作
+    y_triton = WeightedSumFunc.apply(x, weight)
+
+    # 使用PyTorch的内置操作进行对比
+    y_torch = (x * weight).sum(dim=-1)
+
+    # 验证两者结果是否接近
+    print("结果是否接近:", torch.allclose(y_triton, y_torch, atol=1e-5))
+    print("Triton 结果:", y_triton)
+    print("PyTorch 结果:", y_torch)
+
+if __name__ == "__main__":
+
+    main()
