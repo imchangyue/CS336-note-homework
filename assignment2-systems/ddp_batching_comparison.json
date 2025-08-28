@@ -1,0 +1,34 @@
+{
+  "config": {
+    "vocab_size": 32000,
+    "d_model": 512,
+    "n_heads": 8,
+    "n_layers": 12,
+    "seq_len": 512,
+    "batch_size": 1,
+    "lr": 0.0001,
+    "num_samples": 50,
+    "benchmark_steps": 12,
+    "world_size": 2
+  },
+  "model_parameters": 70859776,
+  "individual_approach": {
+    "avg_step_time": 0.10795350869496663,
+    "avg_comm_time": -0.4498373040453629,
+    "comm_percentage": -416.69539923563104,
+    "num_comm_calls": 149.0,
+    "throughput": 18.526493711762523
+  },
+  "batched_approach": {
+    "avg_step_time": 0.14250338077545166,
+    "avg_comm_time": 0.01640327042261759,
+    "comm_percentage": 11.510793872648458,
+    "num_comm_calls": 1.0,
+    "throughput": 14.034754748390712
+  },
+  "improvements": {
+    "step_time_improvement_percent": -32.004399392065274,
+    "comm_time_reduction_percent": 103.6464895808115,
+    "throughput_improvement_percent": -24.244949061893955
+  }
+}

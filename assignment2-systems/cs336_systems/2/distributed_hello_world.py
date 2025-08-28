@@ -2,6 +2,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+import timeit
 
 # 1. 初始化进程组
 # 这步是分布式通信的第一步，它让所有进程能够互相识别并建立通信
@@ -54,7 +55,9 @@ def distributed_demo(rank, world_size):
 if __name__ == "__main__":
     # 定义要启动的进程总数
     world_size = 4
-    
+    time  = timeit.default_timer()
+    print(f"开始启动 {world_size} 个进程...")
+    print(f"启动时间: {time}")
     # torch.multiprocessing.spawn 是一个启动多进程的工具
     # 它会创建 nprocs 个子进程，并让每个子进程都执行 fn 指定的函数
     mp.spawn(
@@ -63,3 +66,5 @@ if __name__ == "__main__":
         nprocs=world_size,    # 要启动的进程数量
         join=True             # 主进程会等待所有子进程执行完毕后才退出
     )
+    end = timeit.default_timer()
+    print(f"所有进程执行完毕。总耗时: {end - time} 秒")
