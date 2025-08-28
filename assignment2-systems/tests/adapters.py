@@ -7,7 +7,8 @@ import triton
 import triton.language as tl
 from typing import Type
 from einops import einsum
-
+from .ddp_overlap_individual_parameters import OverlappedDDP, ToyModel, ToyDataset
+from .ddp_overlap_bucketed import BucketedDDP
 def _flash_backward_kernel(Q, K, V, O, L, dO, is_causal):
     if Q.dim() == 4:
         B, H, N_q, d = Q.shape
@@ -412,6 +413,7 @@ class FlashAttentionTriton(torch.autograd.Function):
         return dQ, dK, dV, None
 
 
+
 def get_ddp_individual_parameters(module: torch.nn.Module) -> torch.nn.Module:
     """
     Returns a torch.nn.Module container that handles
@@ -430,7 +432,8 @@ def get_ddp_individual_parameters(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDPIndividualParameters(module)
-    raise NotImplementedError
+    return OverlappedDDP(module)
+
 
 
 def ddp_individual_parameters_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -445,7 +448,7 @@ def ddp_individual_parameters_on_after_backward(ddp_model: torch.nn.Module, opti
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    ddp_model.finish_gradient_synchronization()
 
 
 def get_ddp_bucketed(module: torch.nn.Module, bucket_size_mb: float) -> torch.nn.Module:
@@ -466,7 +469,7 @@ def get_ddp_bucketed(module: torch.nn.Module, bucket_size_mb: float) -> torch.nn
     Returns:
         Instance of a DDP class.
     """
-    raise NotImplementedError
+    return BucketedDDP(module=module, bucket_size_mb=bucket_size_mb)
 
 
 def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -481,7 +484,7 @@ def ddp_bucketed_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.
             Optimizer being used with the DDP-wrapped model.
     """
     # For example: ddp_model.finish_gradient_synchronization()
-    raise NotImplementedError
+    ddp_model.finish_gradient_synchronization()
 
 
 def ddp_bucketed_on_train_batch_start(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
@@ -494,7 +497,7 @@ def ddp_bucketed_on_train_batch_start(ddp_model: torch.nn.Module, optimizer: tor
         optimizer: torch.optim.Optimizer
             Optimizer being used with the DDP-wrapped model.
     """
-    raise NotImplementedError
+    # ddp_model.reset_buckets()
 
 
 def get_sharded_optimizer(params, optimizer_cls: Type[torch.optim.Optimizer], **kwargs) -> torch.optim.Optimizer:

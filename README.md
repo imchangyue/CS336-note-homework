@@ -44,3 +44,6 @@
 
 #### 8.27
  - working on assignment2
+
+#### 8.28
+ - working on assignment2
