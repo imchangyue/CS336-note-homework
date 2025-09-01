@@ -1,0 +1,9 @@
+compute_budget,parameters,final_loss,hyperparams
+1e+17,75497472,5.694236715624899,"{'n_layer': 24, 'd_model': 512, 'learning_rate': 0.0003, 'batch_size': 256}"
+1e+17,169869312,5.696851981542903,"{'n_layer': 24, 'd_model': 768, 'learning_rate': 0.0003, 'batch_size': 256}"
+1e+17,301989888,5.952064657444602,"{'n_layer': 24, 'd_model': 1024, 'learning_rate': 0.0003, 'batch_size': 256}"
+1e+17,471859200,6.18248398419126,"{'n_layer': 24, 'd_model': 1280, 'learning_rate': 0.0003, 'batch_size': 256}"
+1e+17,679477248,6.40874521513712,"{'n_layer': 24, 'd_model': 1536, 'learning_rate': 0.0003, 'batch_size': 256}"
+3e+17,226492416,5.09230894184709,"{'n_layer': 32, 'd_model': 768, 'learning_rate': 0.0003, 'batch_size': 256}"
+3e+17,402653184,5.259440231990925,"{'n_layer': 32, 'd_model': 1024, 'learning_rate': 0.0003, 'batch_size': 256}"
+3e+17,629145600,5.424458037768018,"{'n_layer': 32, 'd_model': 1280, 'learning_rate': 0.0003, 'batch_size': 256}"
