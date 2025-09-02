@@ -82,7 +82,7 @@ def main():
     """
     主函数，用于组织不同的实验运行并保存结果到 CSV 文件。
     """
-    backends = ["gloo", "nccl"]
+    backends = ["gloo", "nccl"]#gloo
     sizes_mb = [1, 10, 100] # 1GB
     
     # 考虑只有一个GPU，所以对NCCL后端只测试world_size=1

@@ -28,6 +28,9 @@
  - working on lecture6
  - working on assignment2
 
+#### 8.20-23
+ - recovering from zero to hero
+
 
 #### 8.24
  - finished lecture6
@@ -47,3 +50,17 @@
 
 #### 8.28
  - working on assignment2
+
+
+
+#### 8.29-8.31
+ - working on 6DPoseAnything for DDP
+
+#### 9.1
+ - finish assignment3
+ - finish lecture9
+
+
+#### 9.2
+ - finish lecture10
+ - 
