@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "pytest -k test_flash_forward_pass_triton",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/assignment2-systems/.venv/bin/pytest",
+            "args": [
+                "-k",
+                "test_flash_forward_pass_triton"
+            ],
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

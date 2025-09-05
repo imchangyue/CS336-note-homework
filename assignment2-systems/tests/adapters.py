@@ -196,9 +196,9 @@ def flash_fwd_kernel(
 
     # 4. Initialize on-chip accumulators (in SRAM)
     # These must be float32 for precision during accumulation
-    m_i = tl.full((Q_TILE_SIZE,), -float('inf'), dtype=tl.float32)
-    l_i = tl.zeros((Q_TILE_SIZE,), dtype=tl.float32)
-    acc = tl.zeros((Q_TILE_SIZE, D), dtype=tl.float32)
+    m_i = tl.full((Q_TILE_SIZE,), -float('inf'), dtype=tl.float32)#用于稳定 Softmax 计算。在每次循环中，m_i 存储着到目前为止所有处理过的键块的注意力分数中的最大值。
+    l_i = tl.zeros((Q_TILE_SIZE,), dtype=tl.float32) #用于累积 Softmax 分母。它存储着一个经过指数化和缩放的累加和，代表 Softmax 分母的对数。
+    acc = tl.zeros((Q_TILE_SIZE, D), dtype=tl.float32) #用于累积最终的注意力输出。它存储着s_ij 与 v_j 相乘后的结果的加权和。
 
     # 5. Main loop over blocks of K and V
     # We iterate through the key/value sequence dimension
@@ -330,39 +330,26 @@ class FlashAttentionTriton(torch.autograd.Function):
     
     @staticmethod
     def forward(ctx, Q, K, V, is_causal=False):
-        # The test case _make_attn_inputs() generates 3D tensors of shape (batch_size, seq_len, dim)
-        # We need to correctly handle this case, which is a single head.
-        if Q.dim() == 3:
-            B, N_q, d = Q.shape
-            # For a single head, we can treat the 'batch_size' as 'batch_size * num_heads'
-            # The test function will pass a 3D tensor where B=4, N_q=128, d=64.
-            # So, B_H = B * H = 4 * 1 = 4.
-            # The shapes will be (4, 128, 64).
-            B_H = B
-            N_k = K.shape[1]
-            Q_reshaped = Q
-            K_reshaped = K
-            V_reshaped = V
 
-        # elif Q.dim() == 4:
-        #     B, H, N_q, d = Q.shape
-        #     B_H = B * H
-        #     N_k = K.shape[2]
-        #     # Reshape to (B*H, N_q, d) for the kernel
-        #     Q_reshaped = Q.reshape(B_H, N_q, d)
-        #     K_reshaped = K.reshape(B_H, N_k, d)
-        #     V_reshaped = V.reshape(B_H, N_k, d)
-        else:
-             raise ValueError(f"Input Q must be 3D or 4D, but got {Q.dim()}D")
-        
+        B, N_q, d = Q.shape #批次大小 B、查询序列长度 N_q 和隐藏维度 d
+        B_H = B
+        N_k = K.shape[1]
+        Q_reshaped = Q
+        K_reshaped = K
+        V_reshaped = V
+        print("Q.shape:", Q.shape)
+        print("K.shape:", K.shape)
+        print("V.shape:", V.shape)
+
         # Define tile sizes. These can be tuned for performance.
         Q_TILE_SIZE = 16
         K_TILE_SIZE = 16
 
-        # Allocate output tensors
+        #O_reshaped: 存储最终的注意力输出。torch.empty_like 创建一个与 Q 形状、数据类型和设备相同的未初始化张量，这是一种高效的内存分配方式。
         O_reshaped = torch.empty_like(Q_reshaped)
-        # We need to allocate L with the same batch dimension as the reshaped inputs.
+        # L: 存储在线 Softmax 归一化中的log-sum-exp 统计量。L 的形状为 (batch_size, sequence_length)，它在反向传播中是必需的。
         L = torch.empty(B_H, N_q, device=Q.device, dtype=torch.float32)
+
 
         # Define the launch grid
         # Each program instance handles one query tile for one batch/head combination

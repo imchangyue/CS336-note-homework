@@ -63,4 +63,8 @@
 
 #### 9.2
  - finish lecture10
- - 
+
+
+#### 9.4
+ - finish lecture11
+
