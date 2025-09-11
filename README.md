@@ -68,3 +68,9 @@
 #### 9.4
  - finish lecture11
 
+#### 9.5-9.9
+ - working on assignment4
+ - finish lecture 12 - 14
+
+#### 9.10-11
+ - finish lecture 15-17

@@ -14,3 +14,5 @@ def test_extract_text_from_html_bytes():
     with open(moby_expected_path) as f:
         moby_expected_text = f.read()
     assert moby_expected_text == run_extract_text_from_html_bytes(moby_bytes)
+
+
