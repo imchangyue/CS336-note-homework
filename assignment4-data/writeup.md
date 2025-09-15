@@ -102,3 +102,20 @@ s
 ![alt text](image-8.png)
 都是`1.py`下载数据集
 2. 在quality.py中，预测基本正确
+
+
+### problem7
+![alt text](image-9.png)
+训练的时候可以`gunzip positive_samples.warc.warc.gz`
+
+1. 训练代码在`fastText.py`,最终训练出来的模型在`quality_classifier.bin`中
+
+
+### problem8
+![alt text](image-10.png)
+去重代码的思路
+
+
+### problem9
+![alt text](image-11.png)
+代码在`filter_data.py`里面,但是由于电脑配置原因无法运行

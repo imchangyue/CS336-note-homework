@@ -1,0 +1,101 @@
+==================================================
+步骤1: 计算MinHash签名
+==================================================
+
+-> 正在处理文件: test_deduplication/file1.txt
+   - 标准化后的文本: 'this is a sample document for testing the minhash ...'
+   - 提取的 3-grams 数量: 14
+   - 计算的 MinHash 签名: [17161925173249250892110836853329751125, 1469749870334222241601029251820579699, 17146882478454696971998167056642037493, 23642299290445418066456025808683602239, 5276030986780787318265363803832918454, 63204791281347148651822918740228245920, 32093558194463917338997689715330777426, 64846894843958467028229565620499352441, 12586251148471625202680168848419343856, 3772994847266437994740211557294568520]... (共 100 个值)
+
+-> 正在处理文件: test_deduplication/file2.txt
+   - 标准化后的文本: 'this document is a sample for testing the minhash ...'
+   - 提取的 3-grams 数量: 15
+   - 计算的 MinHash 签名: [17161925173249250892110836853329751125, 17599236171517467677220457995262076512, 1276393113683254495388501045854218182, 27641546103320609614509552386384442161, 40818495023242242243022313566359250694, 44373817019878693646399175346098086145, 39130660692316804791773201430363580562, 22257631097321865357110427880145931170, 19862743550570389604783394865620392457, 8916114346499390564645506108034818582]... (共 100 个值)
+
+-> 正在处理文件: test_deduplication/file3.txt
+   - 标准化后的文本: 'a third document completely different from the oth...'
+   - 提取的 3-grams 数量: 13
+   - 计算的 MinHash 签名: [11395423320219282144170498749378411165, 16765068209515010820307198964774309193, 4318318052240251546833312692814747749, 61754544704142234325137830542590371071, 16360854539065578099775150375146506000, 10679675677476078121775301447184105179, 11485428267720926247132308318648890379, 7997275033423051394238981510523704633, 4031833216034276717755102955338347071, 13337428077559060427346981377886329571]... (共 100 个值)
+
+-> 正在处理文件: test_deduplication/file4.txt
+   - 标准化后的文本: 'this is a sample document for testing the minhash ...'
+   - 提取的 3-grams 数量: 14
+   - 计算的 MinHash 签名: [17161925173249250892110836853329751125, 1469749870334222241601029251820579699, 17146882478454696971998167056642037493, 23642299290445418066456025808683602239, 5276030986780787318265363803832918454, 63204791281347148651822918740228245920, 32093558194463917338997689715330777426, 64846894843958467028229565620499352441, 12586251148471625202680168848419343856, 3772994847266437994740211557294568520]... (共 100 个值)
+
+==================================================
+步骤2: 使用LSH识别候选重复项
+==================================================
+
+-> 正在为文件 test_deduplication/file1.txt 生成 LSH 带...
+   - 签名被分成 20 个带，每个带大小为 5
+
+-> 正在为文件 test_deduplication/file2.txt 生成 LSH 带...
+   - 签名被分成 20 个带，每个带大小为 5
+
+-> 正在为文件 test_deduplication/file3.txt 生成 LSH 带...
+   - 签名被分成 20 个带，每个带大小为 5
+
+-> 正在为文件 test_deduplication/file4.txt 生成 LSH 带...
+   - 签名被分成 20 个带，每个带大小为 5
+
+-> 正在从 LSH 桶中收集候选对...
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+   - 发现一个有 2 个文件的桶: {'test_deduplication/file1.txt', 'test_deduplication/file4.txt'}
+
+总计发现 1 个候选重复项对
+
+==================================================
+步骤3: 计算真实Jaccard相似度
+==================================================
+-> 正在比较 'file1.txt' 和 'file4.txt'
+   - 真实 Jaccard 相似度: 1.0000
+   - 相似度 1.0000 >= 阈值 0.8。这是一个重复对！
+
+总计发现 1 个重复项对（阈值 >= 0.8）
+
+==================================================
+步骤4: 聚类重复文档
+==================================================
+-> 正在构建聚类...
+   - 共形成 3 个文档聚类
+     - 聚类 1: ['test_deduplication/file1.txt', 'test_deduplication/file4.txt']
+     - 聚类 2: ['test_deduplication/file2.txt']
+     - 聚类 3: ['test_deduplication/file3.txt']
+
+==================================================
+步骤5: 选择要保留的文档
+==================================================
+-> 从聚类 ['test_deduplication/file1.txt', 'test_deduplication/file4.txt'] 中随机选择保留: test_deduplication/file1.txt
+-> 单个文件，保留: test_deduplication/file2.txt
+-> 单个文件，保留: test_deduplication/file3.txt
+
+==================================================
+步骤6: 写入输出文件
+==================================================
+-> 文件已复制到: deduplicated_output/file1.txt
+-> 文件已复制到: deduplicated_output/file2.txt
+-> 文件已复制到: deduplicated_output/file3.txt
+
+==================================================
+去重完成！
+保留了 3 个文件，共 4 个输入文件
+删除了 1 个重复文件
+==================================================

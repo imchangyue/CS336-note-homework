@@ -6,6 +6,11 @@ from resiliparse.extract.html2text import extract_plain_text
 from resiliparse.parse.encoding import detect_encoding
 import fasttext
 import re
+import hashlib
+import unicodedata
+from collections import defaultdict
+from typing import List, Set, Tuple
+import random
 
 # 在全局作用域加载模型以提高效率，避免重复加载
 try:
@@ -219,8 +224,70 @@ def run_classify_toxic_speech(text: str) -> tuple[Any, float]:
     label = label.replace('__label__', '')
     return label, score
 
-def run_classify_quality(text: str) -> tuple[Any, float]:
-    raise NotImplementedError
+# 加载训练好的模型
+QUALITY_MODEL = None
+
+def load_quality_model(model_path: str = 'quality_classifier.bin'):
+    """加载质量分类器模型"""
+    global QUALITY_MODEL
+    if QUALITY_MODEL is None:
+        try:
+            QUALITY_MODEL = fasttext.load_model(model_path)
+            print(f"Quality model loaded from {model_path}")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise
+    return QUALITY_MODEL
+def run_classify_quality(text: str) -> Tuple[Any, float]:
+    """
+    对文本进行质量分类，返回标签和置信度分数
+    """
+    # 加载模型
+    model = load_quality_model()
+    
+    # 预处理文本
+    if not text or not isinstance(text, str):
+        return 'cc', 0.1
+    
+    text = text.strip()
+    if len(text) < 20:
+        return 'cc', 0.3
+    
+    try:
+        # 关键修复：移除所有换行符
+        clean_text = text.replace('\n', ' ').replace('\r', ' ')
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        
+        if not clean_text or len(clean_text) < 10:
+            return 'cc', 0.2
+            
+        # 现在可以安全预测
+        labels, probabilities = model.predict(clean_text, k=2)
+        high_quality_prob = 0.0
+        # 预测时，k参数可以设置为1，如果只关心最可能的标签
+        labels, probabilities = model.predict(clean_text, k=2) 
+
+        # 核心修复：正确处理labels和probabilities
+        high_quality_prob = 0.0
+        
+        # 遍历所有预测结果，找到high_quality的概率
+        for i, label in enumerate(labels):
+            if label == '__label__high_quality':
+                high_quality_prob = probabilities[i]
+                break
+        
+        print("text is:", clean_text[:500], "score is:", high_quality_prob, "label is:", labels[0])
+        
+        print("score is:",high_quality_prob,"label is:",label)
+        if high_quality_prob >= 0.8:
+            return 'wiki', float(high_quality_prob)
+        else:
+            return 'cc', float(1.0 - high_quality_prob)
+            
+    except Exception as e:
+        print(f"Classification error: {e}")
+        return 'cc', 0.1
+
 
 
 from nltk.tokenize import word_tokenize
@@ -278,10 +345,145 @@ def run_gopher_quality_filter(text: str) -> bool:
     return True
 
 
+
+import hashlib
+
 def run_exact_line_deduplication(
     input_files: list[os.PathLike], output_directory: os.PathLike
 ):
-    raise NotImplementedError
+    """
+    对一组文件执行精确行去重。
+    """
+    # 确保输出目录存在
+    os.makedirs(output_directory, exist_ok=True)
+
+    # 第一次遍历：统计每一行的哈希值及其频率
+    # 使用哈希来节省内存，键为哈希值，值为频率
+    line_counts = {}
+    for file_path in input_files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                # 使用SHA-256哈希来保证唯一性，哈希值作为键
+                line_hash = hashlib.sha256(line.encode('utf-8')).hexdigest()
+                line_counts[line_hash] = line_counts.get(line_hash, 0) + 1
+
+    # 第二次遍历：重写每个文件，只保留唯一的行
+    for file_path in input_files:
+        # 构建输出文件路径，保持原文件名
+        file_name = os.path.basename(file_path)
+        output_path = os.path.join(output_directory, file_name)
+
+        with open(file_path, 'r', encoding='utf-8') as infile, \
+             open(output_path, 'w', encoding='utf-8') as outfile:
+            for line in infile:
+                # 再次计算行的哈希值
+                line_hash = hashlib.sha256(line.encode('utf-8')).hexdigest()
+                
+                # 如果该行在整个语料库中只出现一次，则写入输出文件
+                if line_counts.get(line_hash) == 1:
+                    outfile.write(line)
+
+    print(f"精确行去重完成，输出文件位于：{output_directory}")
+
+
+
+
+
+
+
+def normalize_text(text: str) -> str:
+    """
+    标准化文本：小写、去标点、标准化空白、去重音、NFD Unicode标准化
+    """
+    # NFD Unicode标准化
+    text = unicodedata.normalize('NFD', text)
+    
+    # 去重音符号
+    text = ''.join(c for c in text if not unicodedata.combining(c))
+    
+    # 转小写
+    text = text.lower()
+    
+    # 去标点符号，只保留字母数字和空格
+    text = re.sub(r'[^\w\s]', '', text)
+    
+    # 标准化空白（多个空格变成单个空格）
+    text = re.sub(r'\s+', ' ', text)
+    
+    # 去除首尾空格
+    text = text.strip()
+    
+    return text
+
+
+def get_ngrams(text: str, n: int) -> Set[str]:
+    """
+    从文本中提取n-gram（以单词为单位）
+    """
+    words = text.split()
+    if len(words) < n:
+        return {' '.join(words)} if words else set()
+    
+    ngrams = set()
+    for i in range(len(words) - n + 1):
+        ngram = ' '.join(words[i:i + n])
+        ngrams.add(ngram)
+    
+    return ngrams
+
+
+def hash_function(text: str, seed: int) -> int:
+    """
+    使用种子创建哈希函数
+    """
+    hasher = hashlib.md5()
+    hasher.update(f"{seed}_{text}".encode('utf-8'))
+    return int(hasher.hexdigest(), 16)
+
+
+def compute_minhash_signature(ngrams: Set[str], num_hashes: int) -> List[int]:
+    """
+    计算n-gram集合的MinHash签名
+    """
+    if not ngrams:
+        return [0] * num_hashes
+    
+    signature = []
+    
+    for i in range(num_hashes):
+        min_hash = min(hash_function(ngram, i) for ngram in ngrams)
+        signature.append(min_hash)
+    
+    return signature
+
+
+def lsh_bands(signature: List[int], num_bands: int) -> List[Tuple[int, ...]]:
+    """
+    将签名分成LSH带
+    """
+    band_size = len(signature) // num_bands
+    bands = []
+    
+    for i in range(num_bands):
+        start_idx = i * band_size
+        end_idx = start_idx + band_size
+        band = tuple(signature[start_idx:end_idx])
+        bands.append(band)
+    
+    return bands
+
+
+def jaccard_similarity(set1: Set[str], set2: Set[str]) -> float:
+    """
+    计算两个集合的Jaccard相似度
+    """
+    if not set1 and not set2:
+        return 1.0
+    
+    intersection = len(set1.intersection(set2))
+    union = len(set1.union(set2))
+    
+    return intersection / union if union > 0 else 0.0
 
 
 def run_minhash_deduplication(
@@ -292,4 +494,147 @@ def run_minhash_deduplication(
     jaccard_threshold: float,
     output_directory: os.PathLike,
 ):
-    raise NotImplementedError
+    """
+    使用MinHash和LSH进行模糊文档去重
+    
+    Args:
+        input_files: 输入文件路径列表
+        num_hashes: 计算MinHash签名使用的哈希函数数量
+        num_bands: LSH使用的带数量
+        ngrams: 计算MinHash签名的n-gram长度（以单词为单位）
+        jaccard_threshold: Jaccard相似度阈值
+        output_directory: 输出目录
+    """
+    # 确保输出目录存在
+    os.makedirs(output_directory, exist_ok=True)
+    
+    # 存储每个文件的信息
+    documents = {}  # file_path -> (normalized_text, ngrams, signature)
+    
+    # 第1步：读取文件并计算MinHash签名
+    print("计算MinHash签名...")
+    for file_path in input_files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # 标准化文本
+            normalized_text = normalize_text(content)
+            
+            # 提取n-grams
+            doc_ngrams = get_ngrams(normalized_text, ngrams)
+            
+            # 计算MinHash签名
+            signature = compute_minhash_signature(doc_ngrams, num_hashes)
+            
+            documents[file_path] = (normalized_text, doc_ngrams, signature)
+            
+        except Exception as e:
+            print(f"处理文件 {file_path} 时出错: {e}")
+            continue
+    
+    # 第2步：使用LSH识别候选重复项
+    print("使用LSH识别候选重复项...")
+    band_buckets = defaultdict(set)  # band_hash -> set of file_paths
+    
+    for file_path, (_, _, signature) in documents.items():
+        bands = lsh_bands(signature, num_bands)
+        
+        for band_idx, band in enumerate(bands):
+            # 为每个带创建唯一的桶标识符
+            band_hash = hash(f"{band_idx}_{band}")
+            band_buckets[band_hash].add(file_path)
+    
+    # 收集候选重复项对
+    candidate_pairs = set()
+    for bucket_files in band_buckets.values():
+        if len(bucket_files) > 1:
+            # 将桶中的所有文件对添加为候选项
+            bucket_list = list(bucket_files)
+            for i in range(len(bucket_list)):
+                for j in range(i + 1, len(bucket_list)):
+                    candidate_pairs.add((bucket_list[i], bucket_list[j]))
+    
+    print(f"发现 {len(candidate_pairs)} 个候选重复项对")
+    
+    # 第3步：计算候选项的真实Jaccard相似度并识别重复项
+    print("计算真实Jaccard相似度...")
+    duplicate_pairs = []
+    
+    for file1, file2 in candidate_pairs:
+        _, ngrams1, _ = documents[file1]
+        _, ngrams2, _ = documents[file2]
+        
+        similarity = jaccard_similarity(ngrams1, ngrams2)
+        
+        if similarity >= jaccard_threshold:
+            duplicate_pairs.append((file1, file2, similarity))
+    
+    print(f"发现 {len(duplicate_pairs)} 个重复项对（阈值 >= {jaccard_threshold}）")
+    
+    # 第4步：聚类重复文档
+    print("聚类重复文档...")
+    
+    # 使用并查集进行聚类
+    parent = {}
+    
+    def find(x):
+        if x not in parent:
+            parent[x] = x
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+    
+    # 构建连通组件
+    for file1, file2, _ in duplicate_pairs:
+        union(file1, file2)
+    
+    # 收集聚类
+    clusters = defaultdict(list)
+    for file_path in documents.keys():
+        root = find(file_path)
+        clusters[root].append(file_path)
+    
+    # 第5步：从每个聚类中随机选择一个文档保留
+    print("选择要保留的文档...")
+    files_to_keep = set()
+    
+    for cluster_files in clusters.values():
+        if len(cluster_files) == 1:
+            # 单个文件，直接保留
+            files_to_keep.add(cluster_files[0])
+        else:
+            # 多个文件，随机选择一个保留
+            selected_file = random.choice(cluster_files)
+            files_to_keep.add(selected_file)
+            print(f"从聚类 {cluster_files} 中选择保留: {selected_file}")
+    
+    # 第6步：将保留的文件写入输出目录
+    print("写入输出文件...")
+    
+    for file_path in input_files:
+        if file_path in files_to_keep:
+            # 构建输出文件路径
+            filename = os.path.basename(file_path)
+            output_path = os.path.join(output_directory, filename)
+            
+            try:
+                # 复制原始文件内容（不是标准化后的）
+                with open(file_path, 'r', encoding='utf-8') as input_file:
+                    content = input_file.read()
+                
+                with open(output_path, 'w', encoding='utf-8') as output_file:
+                    output_file.write(content)
+                
+            except Exception as e:
+                print(f"写入文件 {output_path} 时出错: {e}")
+    
+    print(f"去重完成！保留了 {len(files_to_keep)} 个文件，共 {len(input_files)} 个输入文件")
+    print(f"删除了 {len(input_files) - len(files_to_keep)} 个重复文件")
+
+
